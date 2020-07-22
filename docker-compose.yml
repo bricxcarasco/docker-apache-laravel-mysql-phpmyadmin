@@ -1,0 +1,85 @@
+version: '3'
+
+networks:
+    francebed:
+
+volumes:
+    environment-data:
+
+services:
+    apache2:
+        build:
+            context: ./ops/docker
+            dockerfile: Dockerfile
+        image: php:7.3.4-apache-stretch
+        container_name: francebed-apache-server
+        ports:
+            - "8880:80"
+            - "4443:443"
+        volumes:
+            - ./src:/var/www/html
+            - ./ops/config/apache/site-available/000-default.conf:/etc/apache2/sites-enabled/000-default.conf
+        depends_on: 
+            - mysql
+        networks:
+            - francebed
+    mysql:
+        image: mysql:5.7.22
+        container_name: francebed-mysql-server
+        restart: unless-stopped
+        tty: true
+        ports:
+            - "5306:3306"
+        environment:
+            MYSQL_DATABASE: francebed
+            MYSQL_USER: root
+            MYSQL_PASSWORD: root123
+            MYSQL_ROOT_PASSWORD: root123
+            SERVICE_TAGS: dev
+            SERVICE_NAME: mysql
+        networks:
+            - francebed
+    phpmyadmin:
+        image: phpmyadmin/phpmyadmin:4.9
+        container_name: francebed-phpmyadmin
+        links:
+            - mysql:mysql
+        depends_on: 
+            - mysql
+        ports:
+            - "8881:80"
+        environment:
+            - PMA_HOST=mysql
+            - PMA_PORT=3306
+        networks:
+            - francebed
+    composer:
+        image: composer:latest
+        container_name: francebed-composer
+        volumes:
+            - ./src:/var/www/html
+        working_dir: /var/www/html
+        networks:
+            - francebed
+    npm:
+        image: node:12.18
+        container_name: francebed-npm
+        volumes: 
+            - ./src:/var/www/html
+        working_dir: /var/www/html
+        entrypoint: ['npm']
+        networks:
+            - francebed
+    artisan:
+        build:
+            context: ./ops/docker
+            dockerfile: Dockerfile
+        container_name: francebed-artisan
+        volumes:
+            - ./src:/var/www/html
+        depends_on:
+            - mysql
+        working_dir: /var/www/html
+        entrypoint: ['/var/www/html/artisan']
+        networks:
+            - francebed
